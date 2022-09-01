@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"time"
 )
 
 type sortJob struct {
@@ -13,12 +14,10 @@ type sortJob struct {
 func sortWorker(id int, jobs <-chan sortJob, result chan<- []int) {
 	for j := range jobs {
 		if j.b == nil {
-			fmt.Println("worker", id, "bubble sorting list size", len(j.a))
 			// Bubble sort
 			result <- bubbleSort(j.a)
 		} else {
 			// Merge
-			fmt.Println("worker", id, "merging lists of size", len(j.a), "and", len(j.b))
 			result <- merge(j)
 		}
 	}
@@ -62,13 +61,12 @@ func merge(lists sortJob) []int {
 	return result
 }
 
-func multithreadMergeSort(list []int) []int {
-	const numWorkers = 1
-	const minChunkSize = 20
+func multithreadMergeSort(list []int, workers int) []int {
+	const minChunkSize = 10
 	originalLength := len(list)
 	var jobCount int = (originalLength / minChunkSize) + 2
-	jobs := make(chan sortJob, jobCount)      // We'll have the most jobs in the queue at the start.
-	results := make(chan []int, numWorkers*2) // Results in queue shouldn't exceed double the workers.
+	jobs := make(chan sortJob, jobCount)   // We'll have the most jobs in the queue at the start.
+	results := make(chan []int, workers*2) // Results in queue shouldn't exceed double the workers.
 
 	// Preload jobs for bubble sort.
 	for i := 0; i < originalLength; i += minChunkSize {
@@ -80,7 +78,7 @@ func multithreadMergeSort(list []int) []int {
 		jobs <- temp
 	}
 	// Start workers.
-	for w := 1; w <= numWorkers; w++ {
+	for w := 1; w <= workers; w++ {
 		go sortWorker(w, jobs, results)
 	}
 
@@ -89,7 +87,7 @@ func multithreadMergeSort(list []int) []int {
 		a []int
 		b []int
 	)
-	for true {
+	for {
 		a = <-results
 		if len(a) == originalLength {
 			// Result is an entire sorted list.
@@ -107,7 +105,7 @@ func multithreadMergeSort(list []int) []int {
 
 func isSorted(list []int) bool {
 	for i := 1; i < len(list); i++ {
-		if list[i] > list[i-1] {
+		if list[i] < list[i-1] {
 			return false
 		}
 	}
@@ -115,20 +113,41 @@ func isSorted(list []int) bool {
 }
 
 func main() {
-	const listSize = 100
+	// Size of testing list. This should be large enough that cached instructions don't overcome
+	// the benefit of multithreading. Can keep small for testing.
+	const listSize = 999999999
 
 	// Make a list of random numbers.
 	fmt.Print("Building random list... ")
-	numbers := make([]int, listSize)
+	var numbers [listSize]int
 	for i := 0; i < listSize; i++ {
 		numbers[i] = rand.Intn(10 * listSize)
 	}
 	fmt.Println("Done")
 
-	// Run the sort.
-	result := multithreadMergeSort(numbers)
+	runTest := func(threads int) {
+		var (
+			result  []int
+			start   time.Time
+			elapsed time.Duration
+		)
 
-	// Test the sort
-	fmt.Print("Checking if sort is valid... ")
-	fmt.Println(isSorted(result))
+		// Run test with 1 thread.
+		// So the sort doesn't affect the original array.
+		disjoint := make([]int, len(numbers))
+		copy(disjoint, numbers[:])
+
+		fmt.Println("Running test with ", threads, " threads...")
+
+		start = time.Now()
+		result = multithreadMergeSort(disjoint, threads)
+		elapsed = time.Since(start)
+
+		fmt.Println("Completed in ", elapsed, ". PASS? ", isSorted(result), "\n")
+	}
+
+	runTest(1)
+	runTest(4)
+	runTest(16)
+
 }
