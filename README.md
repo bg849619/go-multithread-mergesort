@@ -12,11 +12,11 @@ Although it would work if we started the merge at the individual items and worke
 
 For each thread wanted, we can run a worker function as a goroutine. The workers are just functions with an input and output channel (Basically pipes/queues), and a loop. The input channel will send a custom struct, which can contain two lists. When the worker receives this struct, it will run the merge function on the two lists in its own thread. (Or, if only one of the lists is defined, it will run a bubblesort on that list). Finally, the sorted list will be sent back through the output channel.
 
-The dispatching function, `multithreadMergeSort` is what starts the goroutines sends the jobs to the workers. Initially, it fills the job queue with the chunks of the list as described earlier to be bubblesorted. It will then wait for 2 sorted lists to be returned through the output channel, then push those two lists as another job on the queue. If it receives a output list that is the same length as the original, it kills the workers, and the function returns the sorted list.
+The dispatching function, `multithreadMergeSort` is what starts the goroutines and sends the jobs to the workers. Initially, it fills the job queue with the chunks of the list as described earlier to be bubblesorted. It will then wait for 2 sorted lists to be returned through the output channel, then push those two lists as another job on the queue. If it receives a output list that is the same length as the original, it kills the workers, and the function returns the sorted list.
 
 ## Performance
 
-With the chunk size set to 100, and for a list of size 99999999, my computer (8c/12t) completed the sort in the following times:
+With the chunk size set to 100, and for a list of size 99999999, my computer (8c/16t) completed the sort in the following times:
 |Threads|Completion Time|
 |:-------|---------------:|
 |1|20.0126s|
