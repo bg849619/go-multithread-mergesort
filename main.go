@@ -1,3 +1,5 @@
+// Create by Blake Gall <bg849619@ohio.edu>
+// August 31, 2022
 package main
 
 import (
@@ -11,7 +13,9 @@ type sortJob struct {
 	b []int
 }
 
-func sortWorker(id int, jobs <-chan sortJob, result chan<- []int) {
+// Worker to be ran as a goroutine.
+// Runs sortjobs using a bubblesort if only A has a list, or merge if both.
+func sortWorker(jobs <-chan sortJob, result chan<- []int) {
 	for j := range jobs {
 		if j.b == nil {
 			// Bubble sort
@@ -23,6 +27,7 @@ func sortWorker(id int, jobs <-chan sortJob, result chan<- []int) {
 	}
 }
 
+// Sorts a list using a O(N^2) algorithm
 func bubbleSort(list []int) []int {
 	sorted := false
 	for !sorted {
@@ -39,6 +44,7 @@ func bubbleSort(list []int) []int {
 	return list
 }
 
+// Takes two sorted lists, and merges them into a singular sorted list.
 func merge(lists sortJob) []int {
 	result := make([]int, len(lists.a)+len(lists.b))
 	ac := 0
@@ -61,8 +67,12 @@ func merge(lists sortJob) []int {
 	return result
 }
 
+// The dispatching function for mt merge sort.
+// Splits the list into chunks, starts workers in goroutines, then dispatches new jobs to the workers until a completely sorted list is received.
+// The first chunks created are sorted using bubble sort. The overhead of dispatching merge workers back and forth for smaller lists is more than multithreading a bubblesort for pieces of the list.
 func multithreadMergeSort(list []int, workers int) []int {
-	const minChunkSize = 10
+	var minChunkSize = 100
+
 	originalLength := len(list)
 	var jobCount int = (originalLength / minChunkSize) + 2
 	jobs := make(chan sortJob, jobCount)   // We'll have the most jobs in the queue at the start.
@@ -79,7 +89,7 @@ func multithreadMergeSort(list []int, workers int) []int {
 	}
 	// Start workers.
 	for w := 1; w <= workers; w++ {
-		go sortWorker(w, jobs, results)
+		go sortWorker(jobs, results)
 	}
 
 	// Result handler
@@ -94,6 +104,7 @@ func multithreadMergeSort(list []int, workers int) []int {
 			close(jobs)
 			break
 		} else {
+			// Wait for another sorted list before dispatching to worker.
 			b = <-results
 			jobs <- sortJob{a, b}
 		}
@@ -112,10 +123,12 @@ func isSorted(list []int) bool {
 	return true
 }
 
+// Entrypoint for testing the algorithm.
 func main() {
 	// Size of testing list. This should be large enough that cached instructions don't overcome
 	// the benefit of multithreading. Can keep small for testing.
-	const listSize = 999999999
+
+	const listSize = 99999999
 
 	// Make a list of random numbers.
 	fmt.Print("Building random list... ")
@@ -147,7 +160,10 @@ func main() {
 	}
 
 	runTest(1)
+	runTest(2)
 	runTest(4)
+	runTest(8)
 	runTest(16)
+	runTest(32)
 
 }
